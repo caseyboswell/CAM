@@ -31,11 +31,13 @@ int main(void) {
     trx.delay_usecs = 0;
     trx.len = 32;
 
+    // Fill the buffer with numbers 0 to 31
     for(looper=0; looper<32; ++looper) {
         tx_buffer[looper] = looper;
         rx_buffer[looper] = 0xFF;
     }
 
+    // Open the SPI device
     fd = open(SPI_DEVICE, O_RDWR);
     if(fd < 0) {
         printf("Could not open the SPI device...\r\n");
@@ -58,6 +60,7 @@ int main(void) {
         exit(EXIT_FAILURE);
     }
 
+    // Read the slave's max buffer speed
     ret = ioctl(fd, SPI_IOC_RD_MAX_SPEED_HZ, &scratch32);
     if(ret != 0) {
         printf("Could not read the SPI max speed...\r\n");
@@ -67,6 +70,7 @@ int main(void) {
 
     scratch32 = 5000000;
 
+    // Set the speed to slave's max buffer speed
     ret = ioctl(fd, SPI_IOC_WR_MAX_SPEED_HZ, &scratch32);
     if(ret != 0) {
         printf("Could not write the SPI max speed...\r\n");
@@ -80,7 +84,7 @@ int main(void) {
     }
 
     printf("Received SPI buffer...\r\n");
-    for(looper=0; looper<32; ++looper) {
+    for(looper=0;  looper<32; ++looper) {
         printf("%02x",rx_buffer[looper]);
     }
     printf("\r\n");
