@@ -23,6 +23,9 @@ image = Image.open('4kb_image.png')
 image_bytes = image.tobytes()
 
 image_size = len(image_bytes)
+print(image_size)
+# print(f'\N\N IMAGE SIZE {image_size}')
+
 image_size_array = array.array('i', [image_size])
 image_size_array_bytes = image_size_array.tobytes()
 #print(image_size_array_bytes)
@@ -35,7 +38,8 @@ def send_bytes(image_bytes):
     # bus.write_i2c_block_data(0x03,image_bytes[0], image_bytes[1:2])
     # bus.write_i2c_block_data(0x03, image_bytes[0], list(image_bytes)[:64])
     
-    bus.i2c_rdwr(smbus2.i2c_msg.write(0x03, list(image_bytes)[:512]))
+    for i in range(0, len(image_bytes), 512):  
+        bus.i2c_rdwr(smbus2.i2c_msg.write(0x03, list(image_bytes)[i: i + 512]))
 
 
 #send_bytes(image_size_array_bytes)
