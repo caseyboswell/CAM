@@ -1,14 +1,25 @@
 #include <pigpio.h>
 #include <iostream>
+#include <vector>
+#include <opencv2/opencv.hpp>
+#include <opencv2/imgproc.hpp>
 
 using namespace std;
 
 void runSlave();
 void closeSlave();
 int getControlBits(int, bool);
+void saveImageFromBytes(const std::vector<uint8_t>& imageData, uint16_t width, uint16_t height, const std::string& outputPath);
+
+
 
 const int slaveAddress = 0x03; // <-- Your address of choice
 bsc_xfer_t xfer; // Struct to control data flow
+vector<uint8_t> imageBytes;
+uint32_t imageSize = 0;
+uint16_t imageWidth = 0;
+uint16_t imageHeight = 0;
+std::string outputPath = "output_image.jpg";
 
 int main(){
     // Chose one of those two lines (comment the other out):
@@ -24,7 +35,7 @@ void runSlave() {
     // Close old device (if any)
     xfer.control = getControlBits(slaveAddress, false); // To avoid conflicts when restarting
     bscXfer(&xfer);
-    // Set I2C slave Address to 0x0A
+    // Set I2C slave Address to slaveAddress
     xfer.control = getControlBits(slaveAddress, true);
     int status = bscXfer(&xfer); // Should now be visible in I2C-Scanners
     
@@ -35,17 +46,51 @@ void runSlave() {
         while(1){
             bscXfer(&xfer);
             if(xfer.rxCnt > 0) {
-                cout << "Received " << xfer.rxCnt << " bytes: ";
-                for(int i = 0; i < xfer.rxCnt; i++)
-                    cout << xfer.rxBuf[i];
-                cout << "\n";
+                if (imageSize == 0) {
+                    if (xfer.rxCnt >= 4) {
+                        imageSize = (xfer.rxBuf[0] << 24) | (xfer.rxBuf[1] << 16) | (xfer.rxBuf[2] << 8) | xfer.rxBuf[3];
+                        cout << "Received image size: " << imageSize << " bytes\n";
+                        imageBytes.reserve(imageSize);
+                    } else {
+                        cout << "Error: Received less than 4 bytes for image size\n";
+                    }
+                } else if (imageWidth == 0) {
+                    if (xfer.rxCnt >= 2) {
+                        imageWidth = (xfer.rxBuf[0] << 8) | xfer.rxBuf[1];
+                        cout << "Received image width: " << imageWidth << " pixels\n";
+                    } else {
+                        cout << "Error: Received less than 2 bytes for image width\n";
+                    }
+                } else if (imageHeight == 0) {
+                    if (xfer.rxCnt >= 2) {
+                        imageHeight = (xfer.rxBuf[0] << 8) | xfer.rxBuf[1];
+                        cout << "Received image height: " << imageHeight << " pixels\n";
+                    } else {
+                        cout << "Error: Received less than 2 bytes for image height\n";
+                    }
+                } else {
+                    for(int i = 0; i < xfer.rxCnt; i++) {
+                        imageBytes.push_back(xfer.rxBuf[i]);
+                    }
+                    if (imageBytes.size() == imageSize) {
+                        cout << "Received image matching image size\n";
+
+                        // Save image here
+                        saveImageFromBytes(imageBytes, imageWidth, imageHeight, outputPath);
+                    }
+                }
             }
-            //if (xfer.rxCnt > 0){
-            //    cout << xfer.rxBuf;
-            //}
     }
     }else
         cout << "Failed to open slave!!!\n";
+}
+
+void saveImageFromBytes(const std::vector<uint8_t>& imageData, uint16_t width, uint16_t height, const std::string& outputPath) {
+    cv::Mat bgrImage(height, width, CV_8UC3, const_cast<uint8_t*>(imageData.data()));
+    // cv::Mat image(height, width, CV_8UC3, const_cast<uint8_t*>(imageData.data()));
+    cv::Mat rgbImage;
+    cv::cvtColor(bgrImage, rgbImage, cv::COLOR_BGR2RGB);
+    cv::imwrite(outputPath, rgbImage);
 }
 
 void closeSlave() {
